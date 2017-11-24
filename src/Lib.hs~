@@ -1,0 +1,44 @@
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeFamilies           #-}
+
+module Lib
+  ( someFunc
+  ) where
+
+import           Control.Arrow
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Data.Foldable
+
+class (Monad m) =>
+      Random m where
+  rand :: m Double
+
+class (Ord fitness) =>
+      Individual a fitness | a -> fitness where
+  spawn :: Random m => m a
+  fitness :: a -> fitness
+  mutate :: Random m => a -> m a
+
+class (Individual a fitness, Traversable t) =>
+      Population a fitness t | a -> fitness where
+  data MatingGroup a :: *
+    -- | Select Parents for the next generation
+  selection :: (Random m) => t a -> m (t a)
+  -- | Group Parents for mating
+  groupForMating :: (Random m) => t a -> m (t (MatingGroup a))
+  -- | Produce offspring from MatingGroup
+  reproduce :: (Random m) => MatingGroup a -> m (t a)
+
+measureFitness :: (Population a fitness t, Traversable t) => t a -> t (a, fitness)
+measureFitness = fmap (id &&& fitness)
+
+generateNewPopulation ::
+     (Random m, Population a fitness t, Monad t, Traversable t) => t a -> m (t a)
+generateNewPopulation =
+  fmap join . traverse reproduce <=< groupForMating <=< selection
+
+-- TODO Add options to remove redundant values
+someFunc :: IO ()
+someFunc = putStrLn "someFunc"
